@@ -76,7 +76,6 @@ jobs:
       id: image
       run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
 
-  # Deploy Job
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -91,13 +90,13 @@ jobs:
     #     echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > kubeconfig
     #     export KUBECONFIG=kubeconfig
 
-      # Azure CLI Authentication (Login with Azure)
+      # Auth CLI
     - name: Login to Azure
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    # Set up kubectl for AKS
+    # Set up kube
     - name: Set up kubectl
       run: |
         az aks get-credentials --resource-group myAKSResourceGroup2f5e50 --name myAKSCluster2f5e50 --overwrite-existing
@@ -108,24 +107,41 @@ jobs:
     #     sed -i "s|${{ secrets.DOCKER_USERNAME }}/devops-hw3:.*|${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}|g" k8s/app-v1.yaml
     #     sed -i "s|${{ secrets.DOCKER_USERNAME }}/devops-hw3:.*|${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}|g" k8s/app-v2.yaml
 
-    # Deploy version 1 (Blue Deployment)
+    # Update Kubernetes resources using Kustomize
+    - name: Update Kubernetes resources with Kustomize
+      run: |
+        cd k8s
+        kustomize edit set namespace my-app
+        kustomize edit set image ${DOCKER_USERNAME}/devops-hw3:${{ env.IMAGE_TAG }}
+        cat kustomization.yaml
+
+    # Commit updated Kubernetes manifests
+    - name: Commit updated Kubernetes manifests
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add k8s/kustomization.yaml k8s/app-v1.yaml k8s/app-v2.yaml
+        git commit -m "Update Kubernetes resource definitions with new image tag"
+        git push
+
+    # (Blue Deployment)
     - name: Deploy version 1
       run: |
         kubectl apply -f k8s/app-v1.yaml
         kubectl rollout status deployment/my-app-v1 -w
 
-    # Deploy version 2 (Green Deployment)
+    # (Green Deployment)
     - name: Deploy version 2
       run: |
         kubectl apply -f k8s/app-v2.yaml
         kubectl rollout status deployment/my-app-v2 -w
 
-    # Switch traffic to version 2 (Green Deployment)
+    # Switch traffic to v2
     - name: Switch traffic to version 2
       run: |
         kubectl patch service my-app -p '{"spec":{"selector":{"version":"v2.0.0"}}}'
 
-    # Clean up version 1 (Optional)
+    # Clean v1
     - name: Delete version 1
       run: |
         kubectl delete deployment my-app-v1 || true
