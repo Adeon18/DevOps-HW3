@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: my-app
-          image: ${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}
+          image: ade0n/devops-hw3:latest
           ports:
             - containerPort: 80
 
