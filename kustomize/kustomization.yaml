@@ -1,10 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - deployment.yaml
-  - service.yaml
+- deployment.yaml
+- service.yaml
 namespace: devops-hw3
 images:
-  - name: devops-hw3
-    newName: ade0n/devops-hw3
-    newTag: $GITHUB_SHA
+- name: devops-hw3
+  newName: ade0n/devops-hw3
+  newTag: 6cd6eab6eb1b42d6a9a297c24240dfa634a0079e
