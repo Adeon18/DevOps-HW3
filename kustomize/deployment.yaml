@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: devops-hw3-container
-        image: ade0n/devops-hw3:$GITHUB_SHA
+        image: ade0n/devops-hw3:latest
         ports:
         - containerPort: 80
