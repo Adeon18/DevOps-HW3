@@ -1,45 +1,119 @@
-name: CI/CD for Blue/Green Deployment
+name: CI/CD Blue-Green Deployment (AKS)
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  build-and-push:
+  # Build and Test Job
+  build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+
+    env:
+      IMAGE_NAME: devops-hw3  # Set IMAGE_NAME environment variable
+
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v2
       with:
-        python-version: '3.x'
+        python-version: "3.10"
 
     - name: Install dependencies
       run: |
-        pip install -r app/requirements.txt
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Run tests
+    - name: Lint with flake8
       run: |
-        pytest app/test_hello.py
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-    - name: Set up Docker
+    - name: Test with pytest
+      run: pytest
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      id: buildx
       uses: docker/setup-buildx-action@v2
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v2
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    - uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and push Docker image
+    - name: Build and push
+      uses: docker/build-push-action@v5
+      with:
+        context: ./app
+        file: ./app/Dockerfile
+        builder: ${{ steps.buildx.outputs.name }}
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:${{ github.sha }}, ${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:latest
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache
+
+    - name: Output image tag
+      id: image
+      run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+
+  # Deploy Job
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # Decode and configure kubeconfig
+    - name: Configure kubeconfig
       run: |
-        IMAGE_NAME=<DOCKERHUB_USERNAME>/devops-hw3
-        VERSION=$(date +%Y%m%d%H%M%S)
-        docker build -t $IMAGE_NAME:$VERSION -f app/Dockerfile app
-        docker push $IMAGE_NAME:$VERSION
-      env:
-        DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+
+    # Update Kubernetes manifests with the new image tag
+    - name: Update Kubernetes manifests
+      run: |
+        sed -i "s|${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:.*|${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:${{ env.IMAGE_TAG }}|g" k8s/app-v1.yaml
+        sed -i "s|${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:.*|${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:${{ env.IMAGE_TAG }}|g" k8s/app-v2.yaml
+
+    # Deploy version 1 (Blue Deployment)
+    - name: Deploy version 1
+      run: |
+        kubectl apply -f k8s/app-v1.yaml
+        kubectl rollout status deployment/my-app-v1 -w
+
+    # Deploy version 2 (Green Deployment)
+    - name: Deploy version 2
+      run: |
+        kubectl apply -f k8s/app-v2.yaml
+        kubectl rollout status deployment/my-app-v2 -w
+
+    # Switch traffic to version 2 (Green Deployment)
+    - name: Switch traffic to version 2
+      run: |
+        kubectl patch service my-app -p '{"spec":{"selector":{"version":"v2.0.0"}}}'
+
+    # Clean up version 1 (Optional)
+    - name: Delete version 1
+      run: |
+        kubectl delete deployment my-app-v1 || true
