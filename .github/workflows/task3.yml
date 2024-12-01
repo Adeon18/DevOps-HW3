@@ -100,7 +100,7 @@ jobs:
       run: |
         cd k8s
         kustomize edit set namespace my-app
-        kustomize edit set image ${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}
+        kustomize edit set image ${{ secrets.DOCKER_USERNAME }}/devops-hw3:$GITHUB_SHA
         cat kustomization.yaml
 
     # Commit updated Kubernetes manifests
