@@ -7,4 +7,4 @@ namespace: devops-hw3
 images:
 - name: devops-hw3
   newName: ade0n/devops-hw3
-  newTag: c327b80de7523d9187f3915203de98d985256a45
+  newTag: f91a0f24f1afe08116648498849393c2b28a0fd0
