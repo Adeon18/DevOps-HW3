@@ -103,10 +103,10 @@ jobs:
         az aks get-credentials --resource-group myAKSResourceGroup2f5e50 --name myAKSCluster2f5e50 --overwrite-existing
 
     # Update Kubernetes manifests with the new image tag
-    - name: Update Kubernetes manifests
-      run: |
-        sed -i "s|${{ secrets.DOCKER_USERNAME }}/devops-hw3:.*|${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}|g" k8s/app-v1.yaml
-        sed -i "s|${{ secrets.DOCKER_USERNAME }}/devops-hw3:.*|${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}|g" k8s/app-v2.yaml
+    # - name: Update Kubernetes manifests
+    #   run: |
+    #     sed -i "s|${{ secrets.DOCKER_USERNAME }}/devops-hw3:.*|${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}|g" k8s/app-v1.yaml
+    #     sed -i "s|${{ secrets.DOCKER_USERNAME }}/devops-hw3:.*|${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}|g" k8s/app-v2.yaml
 
     # Deploy version 1 (Blue Deployment)
     - name: Deploy version 1
