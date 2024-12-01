@@ -2,19 +2,17 @@ name: CI/CD Blue-Green Deployment (AKS)
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  # Build and Test Job
   build:
+
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./app
-
-    env:
-      IMAGE_NAME: devops-hw3  # Set IMAGE_NAME environment variable
 
     steps:
     - name: Checkout repository
@@ -33,11 +31,14 @@ jobs:
 
     - name: Lint with flake8
       run: |
+        # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Test with pytest
-      run: pytest
+      run: |
+        pytest
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
@@ -66,7 +67,7 @@ jobs:
         file: ./app/Dockerfile
         builder: ${{ steps.buildx.outputs.name }}
         push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:${{ github.sha }}, ${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:latest
+        tags: ${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ github.sha }}, ${{ secrets.DOCKER_USERNAME }}/devops-hw3:latest
         platforms: linux/amd64,linux/arm64
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache
@@ -93,8 +94,8 @@ jobs:
     # Update Kubernetes manifests with the new image tag
     - name: Update Kubernetes manifests
       run: |
-        sed -i "s|${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:.*|${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:${{ env.IMAGE_TAG }}|g" k8s/app-v1.yaml
-        sed -i "s|${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:.*|${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:${{ env.IMAGE_TAG }}|g" k8s/app-v2.yaml
+        sed -i "s|${{ secrets.DOCKER_USERNAME }}/devops-hw3:.*|${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}|g" k8s/app-v1.yaml
+        sed -i "s|${{ secrets.DOCKER_USERNAME }}/devops-hw3:.*|${{ secrets.DOCKER_USERNAME }}/devops-hw3:${{ env.IMAGE_TAG }}|g" k8s/app-v2.yaml
 
     # Deploy version 1 (Blue Deployment)
     - name: Deploy version 1
