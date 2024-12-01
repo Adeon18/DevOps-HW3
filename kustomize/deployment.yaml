@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-hw3-app
+  labels:
+    app: devops-hw3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devops-hw3
+  template:
+    metadata:
+      labels:
+        app: devops-hw3
+    spec:
+      containers:
+      - name: devops-hw3-container
+        image: ade0n/devops-hw3:$GITHUB_SHA
+        ports:
+        - containerPort: 80
